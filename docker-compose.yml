@@ -59,3 +59,19 @@ services:
       - "80"
     networks:
       - example
+
+  example_verdaccio:
+    image: verdaccio/verdaccio:4
+    environment:
+      VERDACCIO_USER_NAME: example
+    networks:
+      - example
+    ports:
+      - 4874:4873
+
+  example_ganachecli:
+    build: ganachecli
+    networks:
+      - example
+    ports:
+      - 8545:8545
