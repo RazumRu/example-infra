@@ -1,0 +1,13 @@
+service:
+  type: ClusterIP
+  httpPort: 8080
+  host: swagger.example.com
+
+configUrl:
+
+image:
+  repository: swaggerapi/swagger-ui
+  tag: latest
+  pullPolicy: Always
+
+

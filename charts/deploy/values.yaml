@@ -1,0 +1,54 @@
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  httpPort: 5000
+  wsPort: 8083
+  wsEnable: false
+  wsHost: ws.dev.example.com
+  host: api.dev.example.com
+  path: /
+
+image:
+  name: deploy
+  repository: nodeserver
+  tag: 1.0.0
+  pullPolicy: Always
+
+environments:
+  public-url: http://api.dev.example.com
+  # connections
+  mongodb-url: mongodb://localhost:27018/libtrip
+  redis-url: redis://localhost:6379/
+  # sentry-dsn: https://123456@sentry.io/123456
+  # ws
+  ws-redis-url: redis://localhost:6379/
+
+imageCredentials:
+  name: codefresh-docker-secret
+  registry: cfcr
+  username: RazumRu
+  password: XXXXXXXXXXXX
+
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    cpu:
+      targetAverageUtilization: 70
+    memory:
+      targetAverageUtilization: 70
+
+livenessProbe:
+  path: "/liveness/server"
+  initialDelaySeconds: 15
+  timeoutSeconds: 15
+  scheme: "HTTP"
+
+readinessProbe:
+  path: "/liveness/server"
+  initialDelaySeconds: 5
+  timeoutSeconds: 3
+  scheme: "HTTP"
+

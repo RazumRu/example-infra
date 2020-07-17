@@ -1,0 +1,33 @@
+version: '1.0'
+
+stages:
+  - clone
+  - deploy
+
+steps:
+  main_clone:
+    stage: clone
+    title: 'Cloning main repository...'
+    type: git-clone
+    repo: 'app/infra'
+    revision: 'master'
+    git: gitlab
+
+  helm_push:
+    title: Storing Helm chart
+    stage: deploy
+    working_directory: ${{main_clone}}
+    image: 'codefresh/cfstep-helm:2.9.0'
+    environment:
+      - ACTION=push
+      - CHART_REF=charts/verdaccio
+
+  helm_deploy:
+    title: Deploy Helm chart
+    stage: deploy
+    image: 'codefresh/cfstep-helm:2.9.0'
+    environment:
+      - CHART_REF=verdaccio
+      - RELEASE_NAME=verdaccio
+      - KUBE_CONTEXT=${{CLUSTER_NAME}}
+      - VALUE_ingress_hosts[0]=${{NPM_DOMAIN}}

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Chart.Name }}"
+  labels:
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Chart.Name }}-selector"
+      version: "current"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Chart.Name }}-selector"
+        version: "current"
+    spec:
+      containers:
+      - name: "{{ .Chart.Name }}-svc"
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+          - name: "DISPLAY_OPERATION_ID"
+            value: "true"
+          - name: "DEFAULT_MODELS_EXPAND_DEPTH"
+            value: "5"
+          - name: "DEFAULT_MODEL_EXPAND_DEPTH"
+            value: "10"
+          - name: "SHOW_MUTATED_REQUEST"
+            value: "true"
+          - name: "WITH_CREDENTIALS"
+            value: "true"
+          - name: "CONFIG_URL"
+            value: {{ .Values.configUrl }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.httpPort }}
+        livenessProbe:
+          tcpSocket:
+            port: http

@@ -1,0 +1,118 @@
+version: '1.0'
+
+stages:
+  - clone
+  - test
+  - build
+  - deploy
+  - message
+
+services:
+  name: tests_services
+  composition:
+    redis-test:
+      image: redis:latest
+      ports:
+        - 6379
+    mongo-test:
+      image: mongo:latest
+      ports:
+        - 27017
+
+steps:
+  clone:
+    type: parallel
+    stage: clone
+    when:
+      condition:
+        all:
+          skipCi: "includes('${{CF_COMMIT_MESSAGE}}', '[skip ci]') == false"
+    steps:
+      main_clone:
+        title: 'Cloning main repository...'
+        type: git-clone
+        repo: '${{CF_REPO_OWNER}}/${{CF_REPO_NAME}}'
+        revision: '${{CF_REVISION}}'
+        git: gitlab
+      infra_clone:
+        title: 'Cloning infra repository...'
+        type: git-clone
+        repo: '${{CF_REPO_OWNER}}/infra'
+        revision: 'master'
+        git: gitlab
+
+  test:
+    title: run tests
+    working_directory: ${{main_clone}}
+    stage: test
+    image: node:12.13-alpine
+    services:
+      - tests_services
+    when:
+      condition:
+        all:
+          skipCi: "includes('${{CF_COMMIT_MESSAGE}}', '[skip ci]') == false"
+    commands:
+      - echo "//${NPM_DOMAIN}/:_authToken=${NPM_TOKEN}" >> /root/.npmrc
+      - echo "${NPM_PREFIX}:registry=${NPM_DOMAIN_URL}" >> /root/.npmrc
+      - apk update && apk add --no-cache python make build-base gcc wget python3
+      - npm ci
+      - cp .env.example .env
+      - export MONGODB_URL=mongodb://mongo-test:27017/test
+      - export NODE_ENV=test
+      - export REDIS_URL=redis://redis-test:6379
+      - npm test
+
+  build:
+    title: Building docker image
+    type: build
+    stage: build
+    working_directory: ${{main_clone}}
+    dockerfile: ./Dockerfile
+    image_name: "${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}"
+    tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+    when:
+      condition:
+        all:
+          skipCi: "includes('${{CF_COMMIT_MESSAGE}}', '[skip ci]') == false"
+          testMode: "${{TEST_MODE}} == false"
+    build_arguments:
+      - NPM_TOKEN=${{NPM_TOKEN}}
+      - NPM_DOMAIN_URL=${{NPM_DOMAIN_URL}}
+      - NPM_DOMAIN=${{NPM_DOMAIN}}
+      - NPM_PREFIX=${{NPM_PREFIX}}
+
+  helm_deploy:
+    title: Deploy Helm chart
+    stage: deploy
+    image: 'codefresh/cfstep-helm:2.9.0'
+    working_directory: ${{infra_clone}}
+    when:
+      condition:
+        all:
+          skipCi: "includes('${{CF_COMMIT_MESSAGE}}', '[skip ci]') == false"
+          testMode: "${{TEST_MODE}} == false"
+    environment:
+      # system
+      - CHART_REF=charts/deploy
+      - RELEASE_NAME=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}
+      - KUBE_CONTEXT=${{CLUSTER_NAME}}
+      # service
+      - VALUE_service_host=${{MAIN_DOMAIN}}
+      - VALUE_service_wsHost=${{WS_DOMAIN}}
+      - VALUE_service_wsEnable=${{WS_ENABLE}}
+      - VALUE_service_path="${{SERVICE_PATH}}"
+      # image
+      - VALUE_image_repository=r.cfcr.io/s.razumru/${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}
+      - VALUE_image_name=${{CF_REPO_NAME}}
+      - VALUE_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - VALUE_imageCredentials_name=${{CF_REPO_NAME}}-secret
+      - VALUE_imageCredentials_registry=${{DOCKER_REGISTRY}}
+      - VALUE_imageCredentials_username=${{DOCKER_USERNAME}}
+      - VALUE_imageCredentials_password=${{DOCKER_TOKEN}}
+      # environments
+      - VALUE_environments_mongodb-url="${{MONGODB_URL}}"
+      - VALUE_environments_redis-url="${{REDIS_URL}}"
+      # - VALUE_environments_sentry-dsn="${{SENTRY_DSN}}"
+      - VALUE_environments_ws-redis-url="${{WS_REDIS_URL}}"
+      - VALUE_environments_public-url="${{PUBLIC_URL}}"

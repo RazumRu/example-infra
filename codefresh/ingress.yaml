@@ -1,0 +1,16 @@
+version: '1.0'
+
+stages:
+  - deploy
+
+steps:
+  helm_deploy:
+    title: Deploy Helm chart
+    stage: deploy
+    type: helm
+    arguments:
+      action: install
+      chart_name: nginx-ingress
+      release_name: ingress
+      chart_repo_url: https://helm.nginx.com/stable
+      kube_context: ${{CLUSTER_NAME}}

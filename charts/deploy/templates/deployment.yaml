@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Values.image.name }}"
+  labels:
+    chart: "{{ .Values.image.name }}-{{ .Chart.Version | replace "+" "_" }}"
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: "{{  .Values.image.name }}-selector"
+      version: "current"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Values.image.name }}-selector"
+        version: "current"
+    spec:
+      containers:
+        - name: "{{ .Values.image.name }}-svc"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.environments }}
+              - name: {{ $key | upper | replace "-" "_" }}
+                value: {{ $value }}
+            {{- end }}dev.yaml
+          ports:
+          - name: http
+            containerPort: {{ .Values.service.httpPort }}
+          - name: ws
+            containerPort: {{ .Values.service.wsPort }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              scheme: {{ .Values.livenessProbe.scheme }}
+              port: {{ .Values.service.httpPort }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path }}
+              scheme: {{ .Values.readinessProbe.scheme }}
+              port: {{ .Values.service.httpPort }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+      imagePullSecrets:
+        - name: {{ .Values.imageCredentials.name }}

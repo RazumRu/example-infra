@@ -1,0 +1,4 @@
+apiVersion: v1
+description: Swagger UI
+name: swaggerui
+version: 1.0.0

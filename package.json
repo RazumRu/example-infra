@@ -1,0 +1,11 @@
+{
+  "name": "@example/infra",
+  "version": "1.0.0",
+  "description": "Settings for Kubernetes, CI, Helm charts and docker",
+  "scripts": {
+    "deps:up": "docker-compose up --build -d",
+    "deps:stop": "docker-compose stop"
+  },
+  "author": "Sergey Razumovsky",
+  "license": "ISC"
+}

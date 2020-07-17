@@ -1,0 +1,18 @@
+version: '1.0'
+
+stages:
+  - deploy
+
+steps:
+  helm_deploy:
+    title: Deploy Helm chart
+    stage: deploy
+    type: helm
+    arguments:
+      action: install
+      chart_name: redis
+      release_name: redis
+      chart_repo_url: https://marketplace.azurecr.io/helm/v1/repo
+      kube_context: ${{CLUSTER_NAME}}
+      custom_values:
+        - 'password="${{REDIS_PASSWORD}}"'
