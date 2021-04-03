@@ -1,0 +1,32 @@
+output:
+  elasticsearch:
+    enabled: true
+    index: elk-filebeat-%{[agent.version]}-%{+yyyy.MM.dd}
+    hosts:
+      - ${ELASTICSEARCH}
+
+setup:
+  kibana:
+    host: ${KIBANA}
+  template:
+    name: elk-filebeat
+    pattern: elk-filebeat-*
+  dashboards:
+    index: elk-filebeat-*
+  ilm:
+    enabled: false
+
+processors:
+  - decode_json_fields:
+      fields: ["message"]
+      target: "json"
+      overwrite_keys: true
+      add_error_key: true
+
+filebeat:
+  inputs:
+    - type: container
+      paths:
+        - '/var/lib/docker/containers/*/*.log'
+      tags: ["elk"]
+      include_lines: ['elk-filebeat-log']

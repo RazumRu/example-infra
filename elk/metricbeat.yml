@@ -1,0 +1,33 @@
+output:
+  elasticsearch:
+    enabled: true
+    hosts:
+      - ${ELASTICSEARCH}
+
+metricbeat.modules:
+  - module: docker
+    metricsets:
+      - "container"
+      - "cpu"
+      - "diskio"
+      # - "event"
+      - "healthcheck"
+      - "info"
+      # - "image"
+      - "memory"
+      - "network"
+    hosts: ["unix:///var/run/docker.sock"]
+    period: 10s
+    enabled: true
+
+  - module: elasticsearch
+    metricsets:
+      - node
+      - node_stats
+      - index
+      #- index_recovery
+      #- index_summary
+      #- shard
+      #- ml_job
+    period: 10s
+    hosts: [ "http://bibtrip_elk:9200" ]

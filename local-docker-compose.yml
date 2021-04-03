@@ -1,0 +1,215 @@
+version: '3.6'
+
+networks:
+  bibtrip:
+    external: true
+
+volumes:
+  mongo:
+  redis:
+  minio:
+  nginx:
+  filebeat:
+  metricbeat:
+  postgres:
+  portainer:
+
+services:
+  bibtrip_traefik:
+    image: traefik:v2.4
+    container_name: bibtrip_traefik
+    ports:
+      - "80:80" # Web / gRPC
+      - "443:443" # Web / gRPC
+      - "8081:8080" # Swagger
+      - "8086:8082" # Traefik admin
+      - "27019:27017" # Mongo
+      - "9012:9000" # MinIO
+      - "5433:5432" # Postgres
+      - "6381:6379" # Redis
+      - "4873:4873" # Verdaccio
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik/local:/etc/traefik
+    networks:
+      - bibtrip
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.service=api@internal"
+      - "traefik.http.routers.api.entrypoints=traefik"
+      - "traefik.http.routers.api.rule=PathPrefix(`/`)"
+      # - "traefik.http.routers.api.middlewares=auth@file"
+
+  bibtrip_minio:
+    image: minio/minio
+    container_name: bibtrip_minio
+    environment:
+      - MINIO_ACCESS_KEY=localAccess
+      - MINIO_SECRET_KEY=localSecret
+    networks:
+      - bibtrip
+    volumes:
+      - minio:/data
+      - minio:/root/.minio
+    command: server /data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.minio.entrypoints=minio"
+
+  bibtrip_mongo:
+    image: mongo:4
+    container_name: bibtrip_mongo
+    environment:
+      # - MONGO_INITDB_DATABASE=bibtrip
+      - MONGO_INITDB_ROOT_USERNAME=bibtrip
+      - MONGO_INITDB_ROOT_PASSWORD=67HyjU667Hbthjd9OSQp
+    networks:
+      - bibtrip
+    volumes:
+      - ./mongo/entrypoint:/docker-entrypoint-initdb.d
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.mongo.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mongo.entrypoints=mongo"
+
+  bibtrip_postgres:
+    image: postgres
+    container_name: bibtrip_postgres
+    networks:
+      - bibtrip
+    environment:
+      POSTGRES_USER: bibtrip
+      POSTGRES_PASSWORD: 67HyjU667Hbthjd9OSQp
+      POSTGRES_DB: bibtrip
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.postgres.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.postgres.entrypoints=postgres"
+
+  bibtrip_redis:
+    image: redis:5-alpine
+    container_name: bibtrip_redis
+    command: redis-server --requirepass 67HyjU667Hbthjd9OSQp
+    volumes:
+      - redis:/data/cache
+    networks:
+      - bibtrip
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.redis.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.redis.entrypoints=redis"
+
+  bibtrip_verdaccio:
+    image: verdaccio/verdaccio:4
+    container_name: bibtrip_verdaccio
+    networks:
+      - bibtrip
+    volumes:
+      - "./verdaccio:/verdaccio/conf"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.verdaccio.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.verdaccio.entrypoints=verdaccio"
+      - "traefik.http.routers.verdaccio.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.verdaccio.entrypoints=verdaccio"
+
+  bibtrip_swagger_ui:
+    image: swaggerapi/swagger-ui
+    container_name: bibtrip_swagger_ui
+    environment:
+      CONFIG_URL: http://local.bib-trip.com/config/getSwaggerUrls
+      DISPLAY_OPERATION_ID: "true"
+      DEFAULT_MODELS_EXPAND_DEPTH: 5
+      DEFAULT_MODEL_EXPAND_DEPTH: 10
+      SHOW_MUTATED_REQUEST: "true"
+      WITH_CREDENTIALS: "true"
+    networks:
+      - bibtrip
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.swagger.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.swagger.entrypoints=swagger"
+      - "traefik.http.routers.swagger.service=swagger-service"
+      - "traefik.http.services.swagger-service.loadbalancer.server.port=8080"
+      - "traefik.http.services.swagger-service.loadbalancer.server.scheme=http"
+      # - "traefik.http.routers.swagger.middlewares=auth@file"
+
+  bibtrip_elk:
+    container_name: bibtrip_elk
+    image: sebp/elk
+    networks:
+      - bibtrip
+    #volumes:
+      #- ./elk/kibana.yml:/opt/kibana/config/kibana.yml
+      #- ./elk/logstash.yml:/opt/logstash/config/logstash.yml
+      #- ./elk/elasticsearch.yml:/etc/elasticsearch/elasticsearch.yml
+    ports:
+      - "5601:5601"
+      - "9200:9200"
+      - "5044:5044"
+
+  bibtrip_metricbeat:
+    image: docker.elastic.co/beats/metricbeat:7.11.1
+    container_name: bibtrip_metricbeat
+    hostname: metricbeat
+    user: root
+    networks:
+      - bibtrip
+    volumes:
+      - ./elk/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - metricbeat:/usr/share/filebeat/data
+      - /var/lib/docker/containers/:/var/lib/docker/containers/:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /usr/local/bin/docker:/usr/bin/docker:ro
+    environment:
+      - ELASTICSEARCH=bibtrip_elk:9200
+      - KIBANA=bibtrip_elk:5601
+
+  bibtrip_filebeat:
+    image: docker.elastic.co/beats/filebeat:${ELASTIC_VERSION:-7.9.1}
+    container_name: bibtrip_filebeat
+    hostname: filebeat
+    user: root
+    networks:
+      - bibtrip
+    volumes:
+      - ./elk/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - filebeat:/usr/share/filebeat/data
+      - /var/lib/docker/containers/:/var/lib/docker/containers/:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /usr/local/bin/docker:/usr/bin/docker:ro
+    environment:
+      - ELASTICSEARCH=bibtrip_elk:9200
+      - KIBANA=bibtrip_elk:5601
+    command: filebeat -e -strict.perms=false
+
+  bibtrip_consul:
+    container_name: bibtrip_consul
+    networks:
+      - bibtrip
+    build:
+      context: ./consul
+      dockerfile: Dockerfile
+    ports:
+      - 8500:8500
+    command: agent -server -bind 0.0.0.0 -client 0.0.0.0 -bootstrap-expect 1 -config-file=/consul/config/config.json
+    volumes:
+      - ./consul/config.json:/consul/config/config.json
+
+
+  bibtrip_portainer:
+    container_name: bibtrip_portainer
+    networks:
+      - bibtrip
+    image: portainer/portainer
+    command: -H unix:///var/run/docker.sock
+    restart: always
+    ports:
+      - 9005:9000
+      - 8005:8000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer:/data

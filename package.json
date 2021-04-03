@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "Settings for Kubernetes, CI, Helm charts and docker",
   "scripts": {
-    "deps:up": "docker-compose up --build -d",
-    "deps:stop": "docker-compose stop"
+    "deps:local:restart": "npm run deps:local:stop & npm run deps:local:up",
+    "deps:local:up": "docker-compose -f local-docker-compose.yml up --build -d",
+    "deps:prod:up": "docker-compose -f prod-docker-compose.yml up --build -d",
+    "deps:local:stop": "docker-compose -f local-docker-compose.yml stop",
+    "deps:prod:stop": "docker-compose -f prod-docker-compose.yml stop"
   },
   "author": "Sergey Razumovsky",
   "license": "ISC"

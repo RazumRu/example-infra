@@ -1,0 +1,87 @@
+http:
+  services:
+    config-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5000/"
+    files-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5001/"
+    users-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5002/"
+    travel-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5003/"
+    notify-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5004/"
+
+  routers:
+    config-routers:
+      rule: "PathPrefix(`/config/`)"
+      service: config-service
+      middlewares:
+        - strip-first-prefix
+    files-routers:
+      rule: "PathPrefix(`/files/`)"
+      service: files-service
+      middlewares:
+        - strip-first-prefix
+    notify-routers:
+      rule: "PathPrefix(`/notify/`)"
+      service: notify-service
+      middlewares:
+        - strip-first-prefix
+    users-routers:
+      rule: "PathPrefix(`/users/`)"
+      service: users-service
+      middlewares:
+        - strip-first-prefix
+    travel-routers:
+      rule: "PathPrefix(`/travel/`)"
+      service: travel-service
+      middlewares:
+        - strip-first-prefix
+
+  middlewares:
+    strip-first-prefix:
+      stripPrefixRegex:
+        regex:
+          - "^/[^/]+/"
+    auth:
+      basicauth:
+        users:
+          # https://doc.traefik.io/traefik/middlewares/basicauth/
+          # echo $(htpasswd -nb otr thebestotrteam) | sed -e s/\\$/\\$\\$/g
+          # thebestotrteam
+          - otr:$apr1$t/fkbBll$Q7K2SDNo4ed02gVkzz8vE1
+    disable-cache:
+      headers:
+        customResponseHeaders:
+          Cache-Control: no-store
+    cors:
+      headers:
+        accessControlAllowMethods: ["GET", "OPTIONS", "POST", "PUT", "DELETE", "HEAD", "PATCH"]
+        accessControlAllowHeaders:
+          - DNT
+          - User-Agent
+          - X-Requested-With
+          - If-Modified-Since
+          - Cache-Control
+          - Content-Type
+          - Range
+          - x-user-login
+        accessControlExposeHeaders:
+          - Content-Length
+          - Content-Range
+          - Cache-Control
+          - x-response-time
+        accessControlAllowOriginList:
+          - "*"
+        accessControlMaxAge: 3600
+        addVaryHeader: true

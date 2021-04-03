@@ -1,0 +1,42 @@
+entryPoints:
+  web:
+    address: ":80"
+    forwardedHeaders:
+      insecure: true
+  websecure:
+    address: ":443"
+    forwardedHeaders:
+      insecure: true
+  mongo:
+    address: ":27017"
+  minio:
+    address: ":9000"
+  postgres:
+    address: ":5432"
+  redis:
+    address: ":6379"
+  verdaccio:
+    address: ":4873"
+  traefik:
+    address: ":8082"
+  swagger:
+    address: ":8080"
+
+traefikLog:
+  logLevel: DEBUG
+accessLog: {}
+
+serversTransport:
+  forwardingTimeouts:
+    idleConnTimeout: 300s
+
+providers:
+  docker:
+    exposedbydefault: false
+    swarmmode: false
+  file:
+    filename: /etc/traefik/file-source.yml
+
+api:
+  dashboard: true
+  insecure: true
